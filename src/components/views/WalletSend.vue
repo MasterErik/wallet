@@ -10,7 +10,8 @@ import {
     ExclamationTriangleIcon, 
     CheckCircleIcon,
     ShieldExclamationIcon,
-    InformationCircleIcon
+    InformationCircleIcon,
+    ArrowPathIcon
 } from '@heroicons/vue/24/solid';
 import { DocumentDuplicateIcon } from '@heroicons/vue/24/outline';
 
@@ -287,7 +288,10 @@ onMounted(() => {
                     </div>
                     <div class="flex justify-between items-center text-sm">
                         <span class="text-hint">Est. Fee:</span>
-                        <span class="font-bold text-hint font-mono">~{{ estimatedFee }} TON</span>
+                        <div class="flex items-center gap-2">
+                           <ArrowPathIcon v-if="isEstimatingFee" class="w-3 h-3 text-button animate-spin" />
+                           <span class="font-bold text-hint font-mono">~{{ estimatedFee }} TON</span>
+                        </div>
                     </div>
                     <div class="h-px bg-white/5 w-full my-1"></div>
                     <div class="flex flex-col gap-1">
