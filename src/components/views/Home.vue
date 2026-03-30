@@ -114,12 +114,13 @@ onMounted(() => {
                class="bg-secondary rounded-2xl p-4 flex justify-between items-center hover:bg-white/5 transition-all cursor-pointer border border-white/5 group">
             <div class="flex items-center gap-4">
               <div class="w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-110"
-                   :class="tx.type === 'in' ? 'bg-green-500/10 text-green-500' : 'bg-white/5 text-text'">
+                   :class="tx.type === 'in' || tx.type === 'bounced' ? 'bg-green-500/10 text-green-500' : 'bg-white/5 text-text'">
                 <ArrowDownLeftIcon v-if="tx.type === 'in'" class="w-5 h-5" />
+                <ArrowPathIcon v-else-if="tx.type === 'bounced'" class="w-5 h-5" />
                 <ArrowUpRightIcon v-else class="w-5 h-5" />
               </div>
               <div class="flex flex-col">
-                <span class="text-sm font-bold text-text">{{ tx.type === 'in' ? 'Received' : 'Sent' }}</span>     
+                <span class="text-sm font-bold text-text">{{ tx.type === 'in' ? 'Received' : tx.type === 'bounced' ? 'Bounced' : 'Sent' }}</span>     
                 <button @click.stop="copyAddress(tx.address)" class="text-[10px] text-hint font-mono hover:text-text flex items-center gap-1 transition-colors text-left mt-0.5" title="Copy Address">
                   {{ tx.address.slice(0, 8) }}...{{ tx.address.slice(-8) }}
                   <DocumentDuplicateIcon class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -127,8 +128,8 @@ onMounted(() => {
               </div>
             </div>
             <div class="flex flex-col items-end">
-              <div class="text-sm font-black" :class="tx.type === 'in' ? 'text-green-500' : 'text-text'">
-                {{ tx.type === 'in' ? '+' : '-' }}{{ tx.amount.toFixed(6) }}
+              <div class="text-sm font-black" :class="tx.type === 'in' || tx.type === 'bounced' ? 'text-green-500' : 'text-text'">
+                {{ tx.type === 'in' || tx.type === 'bounced' ? '+' : '-' }}{{ tx.amount.toFixed(6) }}
               </div>
               <span class="text-[10px] text-hint mt-0.5">{{ new Date(tx.date).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) }}</span>
             </div>

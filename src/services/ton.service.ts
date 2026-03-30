@@ -8,7 +8,7 @@ const TONCENTER_API_KEY = import.meta.env.VITE_TONCENTER_API_KEY || '';
 
 export interface ParsedTransaction {
     id: string;
-    type: 'in' | 'out';
+    type: 'in' | 'out' | 'bounced';
     amount: number;
     date: string;
     address: string;
@@ -24,6 +24,28 @@ export class TonService {
             endpoint: TONCENTER_ENDPOINT,
             apiKey: TONCENTER_API_KEY,
         });
+    }
+
+    /**
+     * Возвращает флаг bounce для адреса. Если адрес не инициализирован в сети,
+     * принудительно возвращает false, чтобы избежать потери средств на комиссиях.
+     */
+    async getBounceFlag(toAddress: string): Promise<boolean> {
+        try {
+            const parsed = Address.parseFriendly(toAddress);
+            const state = await this.client.getContractState(parsed.address);
+            
+            // Если аккаунт не существует или не инициализирован, bounce должен быть false
+            if (state.state === 'uninitialized' || state.state === 'nonexist') {
+                return false;
+            }
+            
+            // Если аккаунт активен, доверяем флагу из адреса
+            return parsed.isBounceable;
+        } catch (error) {
+            console.error('Failed to get contract state for bounce flag', error);
+            return true; // По умолчанию безопасно
+        }
     }
 
     /**
@@ -79,17 +101,23 @@ export class TonService {
             const txs = await this.client.getTransactions(parsedAddress, { limit });
 
             return txs.map(tx => {
-                const isOut = tx.inMessage?.info.type !== 'internal'; // Упрощенная логика (если нет входящего, значит исходящая)
-
-                // Ищем релевантное сообщение с суммой
+                const inMsg = tx.inMessage;
+                let type: 'in' | 'out' | 'bounced' = 'in';
                 let amount = 0n;
                 let counterparty = '';
 
-                if (!isOut && tx.inMessage?.info.type === 'internal') {
-                    amount = tx.inMessage.info.value.coins;
-                    counterparty = tx.inMessage.info.src.toString({ testOnly: true });
-                } else {
-                    // Исходящая транзакция может иметь несколько выходов (сообщений), берем первое для простоты
+                if (inMsg && inMsg.info.type === 'internal') {
+                    if (inMsg.info.bounced) {
+                        type = 'bounced';
+                        amount = inMsg.info.value.coins;
+                        counterparty = inMsg.info.src.toString({ testOnly: true });
+                    } else {
+                        type = 'in';
+                        amount = inMsg.info.value.coins;
+                        counterparty = inMsg.info.src.toString({ testOnly: true });
+                    }
+                } else if (tx.outMessages.size > 0) {
+                    type = 'out';
                     const outMsg = tx.outMessages.values()[0];
                     if (outMsg?.info.type === 'internal') {
                         amount = outMsg.info.value.coins;
@@ -100,13 +128,13 @@ export class TonService {
                 return {
                     id: tx.hash().toString('hex'), // Уникальный ID
                     hash: tx.hash().toString('hex'),
-                    type: (isOut ? 'out' : 'in') as 'out' | 'in',
+                    type: type,
                     amount: Number(amount) / 1e9,
                     date: new Date(tx.now * 1000).toISOString(),
                     address: counterparty,
                     status: (tx.description.type === 'generic' && tx.description.computePhase?.type === 'vm' && tx.description.computePhase.success ? 'success' : 'failed') as 'success' | 'failed'
                 };
-            }).filter(tx => tx.amount > 0); // Убираем технические транзакции с нулевой суммой (кроме тех, что могут быть spoofing, но для простоты UI пока так)
+            }).filter(tx => tx.amount > 0); // Убираем технические транзакции с нулевой суммой
 
         } catch (error) {
             console.error('Failed to fetch transactions:', error);
@@ -138,6 +166,7 @@ export class TonService {
             }
 
             const seqno = await contract.getSeqno().catch(() => 0);
+            const bounce = await this.getBounceFlag(toAddress);
 
             const transfer = wallet.createTransfer({
                 seqno,
@@ -147,7 +176,7 @@ export class TonService {
                         to: Address.parse(toAddress),
                         value: amountInTon.toString(),
                         body: message || undefined,
-                        bounce: true
+                        bounce
                     })
                 ],
                 sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
@@ -186,6 +215,7 @@ export class TonService {
             const wallet = this.getWalletContract(keyPair);
             const contract = this.client.open(wallet);
             const seqno = await contract.getSeqno();
+            const bounce = await this.getBounceFlag(toAddress);
 
             await contract.sendTransfer({
                 seqno,
@@ -195,7 +225,7 @@ export class TonService {
                         to: Address.parse(toAddress),
                         value: amountInTon.toString(), // amount in TON (string) is parsed correctly by internal()
                         body: message || undefined,
-                        bounce: true // По умолчанию bounce=true, если адрес получателя не инициализирован
+                        bounce
                     })
                 ],
                 sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
