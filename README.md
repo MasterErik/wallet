@@ -9,7 +9,7 @@
 - **mnemonic*: mix pull wagon pave believe venture mirror baby mom brave fuel wool upgrade spirit give syrup swallow
   feed swap suspect hidden social resist easy
 - **address**: kQATCjGpJRgV5om4c_p-xIeLo5zSupGwiTqAZU64NjgNL3eU
- 
+               
 ![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vue.js&logoColor=4FC08D)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 ![TON](https://img.shields.io/badge/TON-0078FF?style=for-the-badge&logo=ton&logoColor=white)
@@ -61,6 +61,29 @@ Explore these resources to extend and deepen your integration with TON and Teleg
     ```bash
     npm run dev
     ```
+
+### 🧪 Running Tests
+
+This project includes unit/component tests (Vitest) and end-to-end (E2E) tests (Playwright).
+
+*   **Unit and Component Tests (Vitest)**:
+    ```bash
+    npm run test
+    # Or, for watch mode during development:
+    # npx vitest
+    # Or, with UI:
+    # npx vitest --ui
+    ```
+
+*   **End-to-End Tests (Playwright)**:
+    ```bash
+    npx playwright test
+    # Or, with UI for debugging:
+    # npx playwright test --ui
+    # Or, with visible browser window:
+    # npx playwright test --headed
+    ```
+    *Note: If running Playwright for the first time, you might need to install browser binaries: `npx playwright install`*
 
 ### 🌍 Deployment
 
