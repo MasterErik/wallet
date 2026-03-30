@@ -35,8 +35,8 @@ Explore these resources to extend and deepen your integration with TON and Teleg
 
 1. **Clone the repository**:
     ```bash
-    git clone https://github.com/thebatclaudio/ton-dapp-vue-template.git
-    cd ton-dapp-vue-template
+    git clone https://github.com/MasterErik/wallet.git
+    cd wallet
     ```
 
 2. **Set the Node.js version** (if using NVM):
