@@ -1,13 +1,13 @@
-# 🚀 TON DApp Vue Template
+# 💎 Pure TON Wallet
+
+## template: TON DApp Vue Template
 
 ## Wallet
-- **mnemonic**: try uphold target ginger evolve attitude rather renew journey cradle door degree pioneer
-  fade way open young post parent tissue normal drink error language
+- **mnemonic**: try uphold target ginger evolve attitude rather renew journey cradle door degree pioneer fade way open young post parent tissue normal drink error language
 - **address**: kQAKJc4h-Xpnj7p2R-SPZsCKWsCMqFV2BHPmXVrE2eqtfBcu
 
 ## Test Wallet
-- **mnemonic*: mix pull wagon pave believe venture mirror baby mom brave fuel wool upgrade spirit give syrup swallow
-  feed swap suspect hidden social resist easy
+- **mnemonic*: mix pull wagon pave believe venture mirror baby mom brave fuel wool upgrade spirit give syrup swallow feed swap suspect hidden social resist easy
 - **address**: kQATCjGpJRgV5om4c_p-xIeLo5zSupGwiTqAZU64NjgNL3eU
                
 ![Vue.js](https://img.shields.io/badge/Vue.js-35495E?style=for-the-badge&logo=vue.js&logoColor=4FC08D)
