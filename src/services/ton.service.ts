@@ -35,8 +35,8 @@ export class TonService {
             const parsed = Address.parseFriendly(toAddress);
             const state = await this.client.getContractState(parsed.address);
             
-            // Если аккаунт не существует или не инициализирован, bounce должен быть false
-            if (state.state === 'uninitialized' || state.state === 'nonexist') {
+            // Если у контракта нет кода или данных, он считается неинициализированным
+            if (!state.code || !state.data) {
                 return false;
             }
             
@@ -184,16 +184,16 @@ export class TonService {
 
             const result = await this.client.estimateExternalMessageFee(wallet.address, {
                 body: transfer,
-                initCode: seqno === 0 ? wallet.init.code : undefined,
-                initData: seqno === 0 ? wallet.init.data : undefined,
+                initCode: seqno === 0 ? wallet.init.code ?? null : null,
+                initData: seqno === 0 ? wallet.init.data ?? null : null,
                 ignoreSignature: false
             });
 
-            if (!result || !result.sourceFees) {
+            if (!result || !result.source_fees) {
                 return DEFAULT_FEE;
             }
 
-            const totalFee = (result.sourceFees.inFwdFee || 0n) + 
+            const totalFee = (result.source_fees.inFwdFee || 0n) + 
                              (result.sourceFees.storageFee || 0n) + 
                              (result.sourceFees.gasFee || 0n) + 
                              (result.sourceFees.fwdFee || 0n);
