@@ -124,7 +124,7 @@ onMounted(() => {
             </div>
             <div class="flex flex-col items-end">
               <div class="text-sm font-black" :class="tx.type === 'in' ? 'text-green-500' : 'text-text'">
-                {{ tx.type === 'in' ? '+' : '-' }}{{ tx.amount.toFixed(2) }}
+                {{ tx.type === 'in' ? '+' : '-' }}{{ tx.amount.toFixed(6) }}
               </div>
               <span class="text-[10px] text-hint">{{ new Date(tx.date).toLocaleDateString() }}</span>
             </div>

@@ -126,12 +126,19 @@ export class TonService {
         amountInTon: number,
         message?: string
     ): Promise<number> {
+        const DEFAULT_FEE = 0.01;
         try {
             const wallet = this.getWalletContract(keyPair);
             const contract = this.client.open(wallet);
+            
+            // Если баланс 0, симуляция на ноде часто падает с 500 ошибкой
+            const balance = await contract.getBalance().catch(() => 0n);
+            if (balance === 0n) {
+                return DEFAULT_FEE;
+            }
+
             const seqno = await contract.getSeqno().catch(() => 0);
 
-            // Создаем перевод без отправки, чтобы получить готовое external сообщение
             const transfer = wallet.createTransfer({
                 seqno,
                 secretKey: keyPair.secretKey,
@@ -146,7 +153,6 @@ export class TonService {
                 sendMode: SendMode.PAY_GAS_SEPARATELY + SendMode.IGNORE_ERRORS,
             });
 
-            // Оцениваем его через API
             const result = await this.client.estimateExternalMessageFee(wallet.address, {
                 body: transfer,
                 initCode: seqno === 0 ? wallet.init.code : undefined,
@@ -154,17 +160,19 @@ export class TonService {
                 ignoreSignature: false
             });
 
-            // Возвращаем сумму всех комиссий (in_fwd_fee + storage_fee + gas_fee + fwd_fee)
-            const totalFee = result.sourceFees.inFwdFee + 
-                             result.sourceFees.storageFee + 
-                             result.sourceFees.gasFee + 
-                             result.sourceFees.fwdFee;
+            if (!result || !result.sourceFees) {
+                return DEFAULT_FEE;
+            }
+
+            const totalFee = (result.sourceFees.inFwdFee || 0n) + 
+                             (result.sourceFees.storageFee || 0n) + 
+                             (result.sourceFees.gasFee || 0n) + 
+                             (result.sourceFees.fwdFee || 0n);
 
             return Number(totalFee) / 1e9;
         } catch (error) {
-            console.error('Failed to estimate fee:', error);
-            // Если оценка не удалась (например, неактивный получатель), возвращаем дефолтное безопасное значение
-            return 0.01;
+            // Не логируем Axios 500 ошибки как критические, так как это ожидаемо для неинициализированных аккаунтов
+            return DEFAULT_FEE;
         }
     }
 
