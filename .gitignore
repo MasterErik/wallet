@@ -37,6 +37,4 @@ dist-ssr
 .vite
 playwright-report
 test-results
-memory-bank/.mcprules-*
-memory/*
 !memory-bank/*.md
