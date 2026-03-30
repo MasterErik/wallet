@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run --exclude \"tests/e2e/**\""
   },
   "dependencies": {
     "@heroicons/vue": "^2.1.5",
@@ -15,18 +15,14 @@
     "@ton/core": "^0.63.1",
     "@ton/crypto": "^3.3.0",
     "@ton/ton": "^14.0.0",
-    "@tonconnect/ui": "^2.0.9",
-    "@twa-dev/sdk": "^7.0.0",
     "@types/node": "^22.10.2",
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "crypto-js": "^4.2.0",
     "pinia": "^2.3.0",
     "qrcode.vue": "^3.8.0",
-    "sass": "^1.83.0",
     "vite-plugin-node-polyfills": "^0.22.0",
     "vue": "^3.5.13",
-    "vue-router": "^4.5.0",
-    "vue3-touch-events": "^4.1.8"
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
@@ -34,6 +30,7 @@
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.4.6",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^17.3.1",
     "jsdom": "^25.0.1",
     "playwright": "^1.58.2",
     "postcss": "^8.4.49",

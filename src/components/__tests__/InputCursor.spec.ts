@@ -5,8 +5,8 @@ import WalletSend from '../views/WalletSend.vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
 
-vi.mock('../../store/wallet.store', () => ({
-  useWalletStore: () => ({
+vi.mock('../../store/active-wallet.store', () => ({
+  useActiveWalletStore: () => ({
     transactions: [],
     whitelist: [],
     isUnlocked: true,

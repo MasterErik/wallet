@@ -2,7 +2,6 @@ import "./mockEnv"; // Импортируем моки перед инициал
 import { createApp } from "vue";
 import { createWebHistory, createRouter } from "vue-router";
 import { createPinia } from "pinia";
-import WebApp from "@twa-dev/sdk";
 
 import "./style.css";
 import App from "./App.vue";
@@ -24,8 +23,6 @@ const router = createRouter({
   routes,
 });
 
-WebApp.ready();
-WebApp.expand();
 
 const app = createApp(App);
 app.use(createPinia());

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useWalletStore } from './store/wallet.store';
+import { useActiveWalletStore } from './store/active-wallet.store';
 
 const router = useRouter();
-const walletStore = useWalletStore();
+const activeWalletStore = useActiveWalletStore();
 
 onMounted(() => {
-  if (!walletStore.isUnlocked) {
+  if (!activeWalletStore.isUnlocked) {
     router.push('/');
   }
 });

@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { useWalletStore } from '../../store/wallet.store';
+import { useActiveWalletStore } from '../../store/active-wallet.store';
 import Button from '../common/Button.vue';
 import { DocumentDuplicateIcon } from '@heroicons/vue/24/outline';
 import { ArrowLeftIcon } from '@heroicons/vue/24/solid';
 import QrcodeVue from 'qrcode.vue';
 
 const router = useRouter();
-const walletStore = useWalletStore();
+const activeWallet = useActiveWalletStore();
 
 const copyAddress = async () => {
   try {
-    await navigator.clipboard.writeText(walletStore.address);
+    await navigator.clipboard.writeText(activeWallet.address);
   } catch (err) {
     console.error('Failed to copy', err);
   }
@@ -31,7 +31,7 @@ const copyAddress = async () => {
     <div class="flex flex-col flex-1 mt-4 w-full">
       <div class="w-64 h-64 mx-auto bg-white rounded-3xl p-4 flex items-center justify-center mb-8 shadow-2xl transition-transform hover:scale-[1.02]">
         <qrcode-vue 
-          :value="'ton://transfer/' + walletStore.address" 
+          :value="'ton://transfer/' + activeWallet.address" 
           :size="224" 
           level="M" 
           background="#ffffff" 
@@ -48,7 +48,7 @@ const copyAddress = async () => {
         <div class="flex items-center gap-2 w-full">
           <!-- Применяем класс .address-field (однострочный) -->
           <div class="address-field hide-scrollbar flex-1">
-            {{ walletStore.address }}
+            {{ activeWallet.address }}
           </div>
           
           <button @click="copyAddress" 
