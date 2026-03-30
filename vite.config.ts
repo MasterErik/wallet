@@ -9,13 +9,10 @@ export default defineConfig({
     vue(),
     nodePolyfills(),
   ],
-  optimizeDeps: {
-    include: ['@tma.js/sdk'],
-  },
   build: {
     outDir: './dist'
   },
-  base: '/wallet/',
+  base: '',
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
