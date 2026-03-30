@@ -193,10 +193,10 @@ export class TonService {
                 return DEFAULT_FEE;
             }
 
-            const totalFee = (result.source_fees.inFwdFee || 0n) + 
-                             (result.sourceFees.storageFee || 0n) + 
-                             (result.sourceFees.gasFee || 0n) + 
-                             (result.sourceFees.fwdFee || 0n);
+            const totalFee = (result.source_fees.in_fwd_fee || 0) + 
+                             (result.source_fees.storage_fee || 0) + 
+                             (result.source_fees.gas_fee || 0) + 
+                             (result.source_fees.fwd_fee || 0);
 
             return Number(totalFee) / 1e9;
         } catch (error) {
