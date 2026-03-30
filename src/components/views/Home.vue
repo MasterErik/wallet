@@ -24,9 +24,10 @@ const filteredTransactions = computed(() => {
   );
 });
 
-const copyAddress = async () => {
+const copyAddress = async (addressToCopy?: string | MouseEvent) => {
   try {
-    await navigator.clipboard.writeText(activeWallet.address);
+    const target = typeof addressToCopy === 'string' ? addressToCopy : activeWallet.address;
+    await navigator.clipboard.writeText(target);
     // В будущем можно добавить Toast уведомление
   } catch (err) {
     console.error('Failed to copy', err);
@@ -119,14 +120,17 @@ onMounted(() => {
               </div>
               <div class="flex flex-col">
                 <span class="text-sm font-bold text-text">{{ tx.type === 'in' ? 'Received' : 'Sent' }}</span>     
-                <span class="text-[10px] text-hint font-mono">{{ tx.address.slice(0, 8) }}...{{ tx.address.slice(-8) }}</span>
+                <button @click.stop="copyAddress(tx.address)" class="text-[10px] text-hint font-mono hover:text-text flex items-center gap-1 transition-colors text-left mt-0.5" title="Copy Address">
+                  {{ tx.address.slice(0, 8) }}...{{ tx.address.slice(-8) }}
+                  <DocumentDuplicateIcon class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
               </div>
             </div>
             <div class="flex flex-col items-end">
               <div class="text-sm font-black" :class="tx.type === 'in' ? 'text-green-500' : 'text-text'">
                 {{ tx.type === 'in' ? '+' : '-' }}{{ tx.amount.toFixed(6) }}
               </div>
-              <span class="text-[10px] text-hint">{{ new Date(tx.date).toLocaleDateString() }}</span>
+              <span class="text-[10px] text-hint mt-0.5">{{ new Date(tx.date).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) }}</span>
             </div>
           </div>
         </template>
