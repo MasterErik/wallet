@@ -1,4 +1,3 @@
-import "./mockEnv"; // Импортируем моки перед инициализацией SDK
 import { createApp } from "vue";
 import { createWebHistory, createRouter } from "vue-router";
 import { createPinia } from "pinia";
