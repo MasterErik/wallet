@@ -38,10 +38,13 @@ jobs:
           cache-dependency-path: './'
       - name: Install dependencies
         run: npm install
-      - name: Copy .env.production to .env
-        run: cp .env.production .env
+
       - name: Build
         run: npm run build
+      - name: Create .env file
+        run: |
+          echo "VITE_TONCENTER_ENDPOINT=https://testnet.toncenter.com/api/v2/jsonRPC" > .env
+          echo "VITE_TONCENTER_API_KEY=" >> .env
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
