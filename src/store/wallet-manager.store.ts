@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { cryptoService } from '../services/crypto.service';
 import { tonService } from '../services/ton.service';
+import { mnemonicValidate, mnemonicToPrivateKey } from '@ton/crypto';
 
 export interface StoredWallet {
   name: string;
@@ -37,33 +38,31 @@ export const useWalletManagerStore = defineStore('walletManager', () => {
     { deep: true } // deep нужен для отслеживания изменений внутри массива savedWallets
   );
 
-  // Экшены
-  const createNewWallet = async (password: string, name?: string): Promise<string[]> => {
-    const mnemonic = await cryptoService.generateMnemonic();
-    const walletName = name || `Wallet ${savedWallets.value.length + 1}`;
-    
-    const encrypted = cryptoService.encryptMnemonic(mnemonic, password);
-    const keyPair = await cryptoService.getKeyPair(mnemonic);
-    const address = tonService.getWalletAddress(keyPair); 
-
-    const newWallet: StoredWallet = { name: walletName, address, encryptedMnemonic: encrypted };
-    savedWallets.value.push(newWallet);
-    currentWalletIndex.value = savedWallets.value.length - 1;
-    
-    return mnemonic;
-  };
-
-  const importExistingWallet = async (mnemonic: string[], password: string, name?: string): Promise<void> => {
-    const isValid = await cryptoService.validateMnemonic(mnemonic);
+  const registerWallet = async (
+      mnemonic: string[],
+      password: string,
+      name?: string
+  ): Promise<void> => {
+    // 1. Валидация (всегда проверяем, что нам пришло)
+    const isValid = await mnemonicValidate(mnemonic);
     if (!isValid) throw new Error('Invalid mnemonic phrase');
-    
-    const walletName = name || `Wallet ${savedWallets.value.length + 1}`;
-    const encrypted = cryptoService.encryptMnemonic(mnemonic, password);
-    const keyPair = await cryptoService.getKeyPair(mnemonic);
-    const address = tonService.getWalletAddress(keyPair); 
 
-    const newWallet: StoredWallet = { name: walletName, address, encryptedMnemonic: encrypted };
-    savedWallets.value.push(newWallet);
+    const keyPair = await mnemonicToPrivateKey(mnemonic);
+    const address = tonService.getWalletAddress(keyPair);
+
+    // ПРОВЕРКА: Если такой кошелек уже есть в списке, не пушим его, а просто выбираем
+    const existingIndex = savedWallets.value.findIndex(w => w.address === address);
+
+    if (existingIndex !== -1) {
+      currentWalletIndex.value = existingIndex;
+      return; // Выходим, так как сохранять заново не нужно
+    }
+
+    // Если кошелька нет — шифруем и сохраняем (ваш старый код)
+    const encrypted = cryptoService.encryptMnemonic(mnemonic, password);
+    const walletName = name || `Wallet ${savedWallets.value.length + 1}`;
+
+    savedWallets.value.push({ name: walletName, address, encryptedMnemonic: encrypted });
     currentWalletIndex.value = savedWallets.value.length - 1;
   };
 
@@ -74,9 +73,9 @@ export const useWalletManagerStore = defineStore('walletManager', () => {
 
   const deleteWallet = (index: number) => {
     if (index < 0 || index >= savedWallets.value.length) throw new Error('Wallet not found');
-    
+
     savedWallets.value.splice(index, 1);
-    
+
     if (savedWallets.value.length === 0) {
       currentWalletIndex.value = -1;
     } else {
@@ -91,8 +90,7 @@ export const useWalletManagerStore = defineStore('walletManager', () => {
     currentWalletIndex,
     hasWallet,
     currentWallet,
-    createNewWallet,
-    importExistingWallet,
+    registerWallet,
     selectWallet,
     deleteWallet
   };

@@ -1,23 +1,13 @@
-# Project Progress
+## Прогресс инициализации проекта
 
-## Completed Milestones
-- [Milestone 1] - [Date]
-- [Milestone 2] - [Date]
-
-## Pending Milestones
-- [Milestone 3] - [Expected date]
-- [Milestone 4] - [Expected date]
-
-## Update History
-
-### [Mar 30, 2026, 12:00 PM] ♻️ Refactor: Архитектурный рефакторинг: разделение store, динамические комиссии, обработка ошибок
-<!-- ID: p_2026-03-30_mncyjl8w -->
-
-- Разделил `wallet.store.ts` на `wallet-manager.store.ts` и `active-wallet.store.ts` (Composition API, автосохранение `localStorage`).\n- Внедрил динамический расчет комиссии `estimateExternalMessageFee` в `ton.service.ts` и `WalletSend.vue`.\n- Добавил обработку и отображение сетевых ошибок `dataError` в `Home.vue`.\n- Удалил неиспользуемый файл `telegram.ts` и исправил ошибки TypeScript.\n- Обновил архитектурный документ `architecture.md` (пункт 7.1).
-
-**Tags:** `architecture`, `refactoring`, `pinia`, `ton`
-
----
-
-- [Date] - [Update]
-- [Date] - [Update]
+- Проверены и созданы файлы памяти (active-context.md, product-context.md, system-patterns.md, progress.md, decision-log.md).
+- Обновлен `system-patterns.md` с подробным описанием технологического стека проекта.
+- Зафиксирована проблема с расхождением мнемоник при создании кошелька в `Auth.vue` и ее решение в `decision-log.md`.
+- Произведен рефакторинг тестовой стратегии из-за несовместимости `@ton/crypto` с `jsdom`:
+    - Все тестовые файлы перемещены из `src/**/__tests__` в `tests/unit`.
+    - Тесты сервисов (`crypto.service.spec.ts`, `ton.service.spec.ts`) и хранилища (`wallet-manager.store.spec.ts`) теперь используют среду `node`.
+    - `Auth.ui.spec.ts` создан для UI-тестов `Auth.vue` в среде `jsdom`.
+    - `wallet-manager.store.spec.ts` был рефакторингован для использования реальных сервисов и включил в себя тесты из `verify-creation-mnemonic.spec.ts`.
+    - Файл `verify-creation-mnemonic.spec.ts` был удален как дубликат.
+    - В `Auth.ui.spec.ts` реализован полный мок `useWalletManagerStore` для изоляции UI-теста от криптографических зависимостей.
+- Все тестовые файлы скорректированы с учетом глобальных моков `localStorage` и `Buffer` из `tests/setup.ts` и обновлены пути импорта.

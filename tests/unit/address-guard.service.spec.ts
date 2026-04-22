@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addressGuard, RiskLevel } from '../address-guard.service';
+import { addressGuard, RiskLevel } from '@/services/address-guard.service';
 
 describe('Address Guard Service (Spoofing Protection)', () => {
     

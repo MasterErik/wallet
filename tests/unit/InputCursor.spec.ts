@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import WalletSend from '../views/WalletSend.vue';
+import WalletSend from '@/components/views/WalletSend.vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia, setActivePinia } from 'pinia';
 
-vi.mock('../../store/active-wallet.store', () => ({
+vi.mock('@/store/active-wallet.store', () => ({
   useActiveWalletStore: () => ({
     transactions: [],
     whitelist: [],

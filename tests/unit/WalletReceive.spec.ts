@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
-import WalletReceive from '../WalletReceive.vue';
-import { useActiveWalletStore } from '../../../store/active-wallet.store';
+import WalletReceive from '@/components/views/WalletReceive.vue';
+import { useActiveWalletStore } from '@/store/active-wallet.store';
 
 // Мокаем зависимости роутера
 vi.mock('vue-router', () => ({

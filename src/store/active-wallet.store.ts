@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 import { cryptoService } from '../services/crypto.service';
 import { tonService, ParsedTransaction } from '../services/ton.service';
-import { KeyPair } from '@ton/crypto';
+import {KeyPair, mnemonicToPrivateKey} from '@ton/crypto';
 import { useWalletManagerStore } from './wallet-manager.store';
 
 const LOCAL_STORAGE_KEY_WHITELIST = 'wallet_whitelist_';
@@ -46,13 +46,13 @@ export const useActiveWalletStore = defineStore('activeWallet', () => {
     const wallet = manager.savedWallets[index];
     try {
       const mnemonic = cryptoService.decryptMnemonic(wallet.encryptedMnemonic, password);
-      const kp = await cryptoService.getKeyPair(mnemonic);
-      
+      const kp = await mnemonicToPrivateKey(mnemonic);
+
       keyPair.value = kp;
       isUnlocked.value = true;
       address.value = wallet.address;
       dataError.value = null;
-      
+
       manager.selectWallet(index);
       loadWhitelist();
       return true;
@@ -60,19 +60,20 @@ export const useActiveWalletStore = defineStore('activeWallet', () => {
       throw new Error('Invalid password');
     }
   };
-  
+
   const lockWallet = () => {
     isUnlocked.value = false;
     keyPair.value = null;
+    address.value = ''; // Очищаем адрес при блокировке
     balance.value = 0;
     transactions.value = [];
     whitelist.value = [];
     dataError.value = null;
   };
-  
+
   const refreshWalletData = async () => {
     if (!address.value) return;
-    
+
     isLoadingData.value = true;
     dataError.value = null;
     try {
@@ -89,7 +90,7 @@ export const useActiveWalletStore = defineStore('activeWallet', () => {
       isLoadingData.value = false;
     }
   };
-  
+
   const addToWhitelist = (addr: string) => {
     if (!whitelist.value.includes(addr)) {
       whitelist.value.push(addr);

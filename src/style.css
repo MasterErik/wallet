@@ -23,13 +23,13 @@
   /* Строго однострочное поле для TON адреса */
   .address-field {
     @apply bg-bg border border-white/10 rounded-xl px-4 outline-none transition-all text-text font-mono text-[10px] sm:text-[11px] whitespace-nowrap overflow-x-auto text-center;
-    height: 56px; 
+    height: 56px;
     width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    line-height: 56px; 
+    line-height: 56px;
   }
-  
+
   input.address-field:focus, input.input-field:focus {
     @apply border-button;
   }

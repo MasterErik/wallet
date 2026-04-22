@@ -4,8 +4,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
-import WalletSend from '../WalletSend.vue';
-import { useActiveWalletStore } from '../../../store/active-wallet.store';
+import WalletSend from '@/components/views/WalletSend.vue';
+import { useActiveWalletStore } from '@/store/active-wallet.store';
 
 // Мокаем зависимости
 vi.mock('vue-router', () => ({
@@ -14,7 +14,7 @@ vi.mock('vue-router', () => ({
     })
 }));
 
-vi.mock('../../../services/ton.service', () => ({
+vi.mock('@/services/ton.service', () => ({
     tonService: {
         isValidAddress: vi.fn((addr) => addr.startsWith('EQ')),
         getBalance: vi.fn().mockResolvedValue(1.0)

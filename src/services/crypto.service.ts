@@ -1,4 +1,4 @@
-import { mnemonicNew, mnemonicValidate, mnemonicToPrivateKey } from '@ton/crypto';
+import {mnemonicNew, mnemonicToPrivateKey, mnemonicValidate} from '@ton/crypto';
 import CryptoJS from 'crypto-js';
 
 const ENCRYPTION_SALT = 'ton-wallet-salt-v1';
@@ -32,7 +32,7 @@ export class CryptoService {
         const mnemonicString = mnemonic.join(' ');
         // Используем PBKDF2 для усиления пароля перед шифрованием (защита от перебора)
         const key = CryptoJS.PBKDF2(password, ENCRYPTION_SALT, { keySize: 256 / 32, iterations: 1000 });
-        
+
         // Шифруем алгоритмом AES
         const encrypted = CryptoJS.AES.encrypt(mnemonicString, key.toString());
         return encrypted.toString();
@@ -46,11 +46,11 @@ export class CryptoService {
             const key = CryptoJS.PBKDF2(password, ENCRYPTION_SALT, { keySize: 256 / 32, iterations: 1000 });
             const decrypted = CryptoJS.AES.decrypt(encryptedMnemonic, key.toString());
             const originalText = decrypted.toString(CryptoJS.enc.Utf8);
-            
+
             if (!originalText) {
                 throw new Error('Invalid password or corrupted data');
             }
-            
+
             return originalText.split(' ');
         } catch (e) {
             throw new Error('Decryption failed. Invalid password.');

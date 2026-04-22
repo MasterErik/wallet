@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
-import { tonService } from '../ton.service';
+/**
+ * @vitest-environment node
+ */
+import { tonService } from '@/services/ton.service';
 import { mnemonicToPrivateKey } from '@ton/crypto';
+import { describe, it, expect, vi } from 'vitest';
 
 describe('TonService (TONCENTER Integration)', () => {
 

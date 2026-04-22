@@ -1,22 +1,23 @@
 /**
- * @vitest-environment jsdom
+ * @vitest-environment node
  */
-import { describe, it, expect, vi } from 'vitest';
-import { cryptoService } from '../crypto.service';
+import { describe, it, expect } from 'vitest';
+import { cryptoService } from '@/services/crypto.service';
+import {mnemonicToPrivateKey, mnemonicValidate} from "@ton/crypto";
 
 describe('CryptoService', () => {
     const password = 'test-password-123';
     const mnemonic = [
-        'notice', 'rookie', 'clutch', 'poverty', 'pink', 'justice', 
-        'dune', 'pave', 'identity', 'motto', 'civil', 'found', 
-        'inner', 'heart', 'rely', 'humor', 'diet', 'lumber', 
+        'notice', 'rookie', 'clutch', 'poverty', 'pink', 'justice',
+        'dune', 'pave', 'identity', 'motto', 'civil', 'found',
+        'inner', 'heart', 'rely', 'humor', 'diet', 'lumber',
         'pioneer', 'unfold', 'fringe', 'album', 'rely', 'abandon'
     ];
 
     it('должен генерировать валидную мнемонику из 24 слов', async () => {
         const generated = await cryptoService.generateMnemonic();
         expect(generated.length).toBe(24);
-        const isValid = await cryptoService.validateMnemonic(generated);
+        const isValid = await mnemonicValidate(generated);
         expect(isValid).toBe(true);
     });
 
@@ -37,12 +38,7 @@ describe('CryptoService', () => {
     });
 
     it('должен генерировать ключи из мнемоники', async () => {
-        // Заменяем реальный вызов на мок, так как @ton/crypto имеет проблемы в jsdom
-        const mockKeyPair = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(64) } as any;
-        vi.spyOn(cryptoService, 'getKeyPair').mockResolvedValue(mockKeyPair);
-        
-        const keyPair = await cryptoService.getKeyPair(mnemonic);
-        expect(keyPair).toEqual(mockKeyPair);
+        const keyPair = await mnemonicToPrivateKey(mnemonic);
         expect(keyPair.publicKey.length).toBe(32);
     });
 });
