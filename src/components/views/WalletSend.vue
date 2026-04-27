@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { useActiveWalletStore } from '../../store/active-wallet.store';
-import { tonService } from '../../services/ton.service';
-import { addressGuard, RiskLevel, Evaluation } from '../../services/address-guard.service';
+import {computed, onMounted, ref, watch} from 'vue';
+import {useRouter} from 'vue-router';
+import {useActiveWalletStore} from '@/store/active-wallet.store.ts';
+import {tonService} from '@/services/ton.service.ts';
+import {addressGuard, Evaluation, RiskLevel} from '@/services/address-guard.service.ts';
 import Button from '../common/Button.vue';
-import { 
-    ArrowLeftIcon, 
-    ExclamationTriangleIcon, 
-    CheckCircleIcon,
-    ShieldExclamationIcon,
-    InformationCircleIcon,
-    ArrowPathIcon
-} from '@heroicons/vue/24/solid';
-import { DocumentDuplicateIcon } from '@heroicons/vue/24/outline';
+import {ArrowLeftIcon, ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, InformationCircleIcon, ShieldExclamationIcon} from '@heroicons/vue/24/solid';
+import {DocumentDuplicateIcon} from '@heroicons/vue/24/outline';
 
 const activeWallet = useActiveWalletStore();
 const router = useRouter();
@@ -28,6 +21,7 @@ const evaluation = ref<Evaluation | null>(null);
 // Динамически рассчитываемая комиссия сети
 const estimatedFee = ref(0.01);
 const isEstimatingFee = ref(false);
+const isSuccess = ref(false);
 
 // Функция для пересчета комиссии
 const updateFeeEstimate = async () => {
@@ -35,7 +29,7 @@ const updateFeeEstimate = async () => {
         estimatedFee.value = 0.01; // Дефолтное значение
         return;
     }
-    
+
     isEstimatingFee.value = true;
     try {
         const fee = await tonService.estimateFee(
@@ -59,11 +53,11 @@ watch(recipient, async (newAddr) => {
         evaluation.value = null;
         return;
     }
-    
+
     // Запускаем защиту от подмены (Spoofing)
     evaluation.value = addressGuard.evaluateAddress(
-        newAddr, 
-        activeWallet.transactions, 
+        newAddr,
+        activeWallet.transactions,
         activeWallet.whitelist
     );
 
@@ -85,11 +79,11 @@ watch(amount, async () => {
 const isInvalid = computed(() => {
     // 1. Проверяем валидность формата адреса через tonService
     if (!recipient.value || !tonService.isValidAddress(recipient.value)) return true;
-    
+
     // 2. Проверяем сумму
     if (!amount.value || amount.value <= 0) return true;
     if (amount.value + estimatedFee.value > activeWallet.balance) return true;
-    
+
     // 3. Блокируем отправку при критическом риске подмены, пока пользователь сам не разрешит (в модалке)
     // Но кнопку "Continue" мы оставляем активной, чтобы показать модалку подтверждения.
     return false;
@@ -107,7 +101,7 @@ const handleSendClick = () => {
 
 const confirmTransaction = async () => {
     error.value = '';
-    
+
     // 1. Проверяем пароль и разблокируем ключ
     try {
         // We shouldn't call activeWallet.unlockWallet here again if it's already unlocked. Wait, the original code called `await walletStore.unlockWallet(walletStore.currentWalletIndex, confirmPassword.value)`
@@ -128,34 +122,35 @@ const confirmTransaction = async () => {
     isLoading.value = true;
     try {
         const keyPair = activeWallet.keyPair;
-        
+
         // 2. Получаем текущий seqno кошелька перед отправкой
         const walletContract = tonService.getWalletContract(keyPair);
         const contract = tonService['client'].open(walletContract); // используем публичный метод или обращаемся к client
         const initialSeqno = await contract.getSeqno().catch(() => 0); // Если кошелек пустой, seqno = 0
 
         // 3. Отправляем реальную транзакцию в Testnet
-        await tonService.sendTransaction(
-            keyPair,
-            recipient.value,
-            amount.value,
-            'Sent via Vue TON Wallet' // Сообщение
-        );
+        await tonService.sendTransaction(keyPair, recipient.value, amount.value,'Sent via Vue TON Wallet');
 
         // 4. Ожидаем подтверждения сетью (Поллинг)
         const isConfirmed = await tonService.waitForTransaction(keyPair, initialSeqno);
-        
+
         if (isConfirmed) {
-            // Успех! Добавляем в доверенные, если прошло успешно
-            activeWallet.addToWhitelist(recipient.value);
+          // Успех! Добавляем в доверенные, если прошло успешно
+          isSuccess.value = true;
+          activeWallet.addToWhitelist(recipient.value);
+          showConfirm.value = false;
+          recipient.value = '';
+          amount.value = null;
+          confirmPassword.value = '';
+
+          // Обновляем данные на главной
+          await activeWallet.refreshWalletData();
+          // Даем пользователю 3 секунды увидеть успех, потом уходим
+          setTimeout(() => {
             showConfirm.value = false;
-            recipient.value = '';
-            amount.value = null;
-            confirmPassword.value = '';
-            
-            // Обновляем данные на главной
-            await activeWallet.refreshWalletData();
+            isSuccess.value = false;
             router.push('/home');
+          }, 3000);
         } else {
             error.value = 'Transaction sent, but taking too long to confirm. Check your history later.';
             // Все равно возвращаем на главную, так как транзакция ушла в мемпул
@@ -163,7 +158,7 @@ const confirmTransaction = async () => {
             await activeWallet.refreshWalletData();
             setTimeout(() => router.push('/home'), 3000);
         }
-        
+
     } catch (e: any) {
         console.error(e);
         error.value = 'Transaction failed: ' + (e.message || 'Unknown error');
@@ -180,8 +175,7 @@ const setMaxAmount = () => {
 
 const pasteAddress = async () => {
     try {
-        const text = await navigator.clipboard.readText();
-        recipient.value = text;
+      recipient.value = await navigator.clipboard.readText();
     } catch (e) {
         console.error('Failed to read clipboard');
     }
@@ -194,30 +188,30 @@ onMounted(() => {
 
 <template>
     <div class="flex flex-col h-full p-4 w-full max-w-md mx-auto pt-8">
-        
+
         <div class="flex items-center gap-4 mb-6">
             <button @click="router.push('/home')" class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center hover:bg-white/10 transition-colors">
                 <ArrowLeftIcon class="w-5 h-5 text-hint" />
             </button>
             <h2 class="text-2xl font-bold tracking-tight">Send TON</h2>
         </div>
-        
+
         <div class="flex-1 flex flex-col gap-5 w-full">
-            
+
             <!-- Recipient Input -->
             <div class="card relative">
                 <label class="field-label">Recipient Address</label>
-                
+
                 <div class="flex items-center gap-2 w-full">
                     <input type="text" v-model="recipient" placeholder="EQ..." class="address-field hide-scrollbar flex-1" style="width: 100%; min-width: 0;" spellcheck="false" />
-                    
-                    <button @click="pasteAddress" 
+
+                    <button @click="pasteAddress"
                             class="shrink-0 w-14 h-[56px] rounded-xl bg-bg border border-white/10 flex items-center justify-center hover:bg-button hover:border-button hover:text-white transition-all text-hint"
                             title="Paste Address">
                         <DocumentDuplicateIcon class="w-5 h-5 rotate-180" />
                     </button>
                 </div>
-                
+
                 <!-- Окно оценки риска (Spoofing Protection) -->
                 <div v-if="evaluation" class="mt-3 animate-fade-in">
                     <!-- Безопасный (Whitelist / Уникальный) -->
@@ -251,7 +245,7 @@ onMounted(() => {
                     <label class="field-label !mb-0">Amount to Send</label>
                     <span class="text-xs text-hint font-mono">Bal: {{ activeWallet.balance.toFixed(4) }} TON</span>
                 </div>
-                
+
                 <div class="relative">
                     <input type="number" v-model="amount" placeholder="0.00" class="input-field pr-20 text-[16px] font-mono" />
                     <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -273,59 +267,81 @@ onMounted(() => {
         </div>
 
         <!-- Confirm Modal (С проверкой Spoofing) -->
-        <div v-if="showConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <div class="bg-secondary border border-white/10 rounded-3xl p-6 w-full max-w-sm flex flex-col gap-6 shadow-2xl animate-fade-in">
-                
-                <div class="text-center">
-                    <h2 class="text-xl font-black mb-1">Confirm Transfer</h2>
-                    <p class="text-hint text-xs">You are about to send funds on Testnet</p>
-                </div>
+      <div v-if="showConfirm" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div class="bg-secondary border border-white/10 rounded-3xl p-6 w-full max-w-sm flex flex-col shadow-2xl animate-fade-in">
 
-                <div class="bg-bg rounded-xl p-4 border border-white/5 space-y-3">
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-hint">Amount:</span>
-                        <span class="font-bold text-text font-mono">{{ amount }} TON</span>
-                    </div>
-                    <div class="flex justify-between items-center text-sm">
-                        <span class="text-hint">Est. Fee:</span>
-                        <div class="flex items-center gap-2">
-                           <ArrowPathIcon v-if="isEstimatingFee" class="w-3 h-3 text-button animate-spin" />
-                           <span class="font-bold text-hint font-mono">~{{ estimatedFee }} TON</span>
-                        </div>
-                    </div>
-                    <div class="h-px bg-white/5 w-full my-1"></div>
-                    <div class="flex flex-col gap-1">
-                        <span class="text-hint text-sm">To Address:</span>
-                        <span class="text-[10px] text-text font-mono break-all leading-relaxed">{{ recipient }}</span>
-                    </div>
-                </div>
-
-                <div v-if="evaluation?.level === RiskLevel.Critical" class="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-center">
-                    <ExclamationTriangleIcon class="w-6 h-6 text-red-500 mx-auto mb-2 animate-bounce" />
-                    <p class="text-[11px] text-red-200 font-bold uppercase tracking-wide">Warning: Potential Spoofing Attack</p>
-                    <p class="text-[10px] text-red-300 mt-1">Are you absolutely sure you want to send to this address?</p>
-                </div>
-
-                <div class="space-y-3">
-                    <input type="password" v-model="confirmPassword" placeholder="Enter master password to sign" class="input-field text-center" />
-                    <div v-if="error" class="text-red-400 text-xs text-center">{{ error }}</div>
-                </div>
-
-                <div class="flex gap-3 mt-2">
-                    <Button @click="showConfirm = false" class="flex-1 bg-white/5 !shadow-none !text-hint hover:!text-text hover:!bg-white/10 py-3">
-                        Cancel
-                    </Button>
-                    <Button :loading="isLoading" :disabled="isLoading" @click="confirmTransaction" 
-                            class="flex-1 py-3" :class="{'bg-red-500 hover:bg-red-600 shadow-red-500/30': evaluation?.level === RiskLevel.Critical}">
-                       {{ evaluation?.level === RiskLevel.Critical ? 'Send Anyway' : 'Confirm & Send' }}
-                    </Button>
-                </div>
+          <div v-if="!isSuccess" class="flex flex-col gap-6">
+            <div class="text-center">
+              <h2 class="text-xl font-black mb-1">Confirm Transfer</h2>
+              <p class="text-hint text-xs">You are about to send funds on Testnet</p>
             </div>
+
+            <div class="bg-bg rounded-xl p-4 border border-white/5 space-y-3">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-hint">Amount:</span>
+                <span class="font-bold text-text font-mono">{{ amount }} TON</span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-hint">Est. Fee:</span>
+                <div class="flex items-center gap-2">
+                  <ArrowPathIcon v-if="isEstimatingFee" class="w-3 h-3 text-button animate-spin" />
+                  <span class="font-bold text-hint font-mono">~{{ estimatedFee }} TON</span>
+                </div>
+              </div>
+              <div class="h-px bg-white/5 w-full my-1"></div>
+              <div class="flex flex-col gap-1">
+                <span class="text-hint text-sm">To Address:</span>
+                <span class="text-[10px] text-text font-mono break-all leading-relaxed">{{ recipient }}</span>
+              </div>
+            </div>
+
+            <div v-if="evaluation?.level === RiskLevel.Critical" class="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-center">
+              <ExclamationTriangleIcon class="w-6 h-6 text-red-500 mx-auto mb-2 animate-bounce" />
+              <p class="text-[11px] text-red-200 font-bold uppercase tracking-wide">Warning: Potential Spoofing Attack</p>
+              <p class="text-[10px] text-red-300 mt-1">Are you absolutely sure you want to send to this address?</p>
+            </div>
+
+            <div class="space-y-3">
+              <input type="password" v-model="confirmPassword" placeholder="Enter master password" class="input-field text-center" @keyup.enter="confirmTransaction" />
+              <div v-if="error" class="text-red-400 text-xs text-center">{{ error }}</div>
+            </div>
+
+            <div class="flex gap-3 mt-2">
+              <Button @click="showConfirm = false" :disabled="isLoading" class="flex-1 bg-white/5 !shadow-none !text-hint hover:!text-text hover:!bg-white/10 py-3">
+                Cancel
+              </Button>
+              <Button :loading="isLoading" :disabled="isLoading || !confirmPassword" @click="confirmTransaction"
+                      class="flex-1 py-3" :class="{'bg-red-500 hover:bg-red-600 shadow-red-500/30': evaluation?.level === RiskLevel.Critical}">
+                {{ evaluation?.level === RiskLevel.Critical ? 'Send Anyway' : 'Confirm & Send' }}
+              </Button>
+            </div>
+          </div>
+
+          <div v-else class="flex flex-col items-center py-8 animate-fade-in text-center">
+            <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-500/10">
+              <CheckCircleIcon class="w-12 h-12 text-green-500" />
+            </div>
+            <h2 class="text-2xl font-black text-white mb-2">Success!</h2>
+            <p class="text-hint text-sm px-4 leading-relaxed">
+              Your transaction has been confirmed by the TON network.
+            </p>
+            <div class="mt-8 w-full">
+              <div class="text-[10px] text-hint uppercase tracking-widest font-bold mb-2">Redirecting to Home...</div>
+              <div class="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                <div class="h-full bg-green-500 animate-progress"></div>
+              </div>
+            </div>
+          </div>
+
         </div>
+      </div>
     </div>
 </template>
 
 <style scoped>
+.animate-progress {
+  animation: progress 3s linear forwards;
+}
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
 }
@@ -333,5 +349,9 @@ onMounted(() => {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes progress {
+  from { width: 0; }
+  to { width: 100%; }
 }
 </style>

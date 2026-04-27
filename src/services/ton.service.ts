@@ -1,10 +1,12 @@
-import { TonClient, WalletContractV4, internal, SendMode } from '@ton/ton';
-import { KeyPair } from '@ton/crypto';
-import { Address } from '@ton/core';
+import {fromNano, internal, SendMode, TonClient, WalletContractV4} from '@ton/ton';
+import {KeyPair} from '@ton/crypto';
+import {Address} from '@ton/core';
 
 // Используем значения из .env
 const TONCENTER_ENDPOINT = import.meta.env.VITE_TONCENTER_ENDPOINT || 'https://testnet.toncenter.com/api/v2/jsonRPC';
 const TONCENTER_API_KEY = import.meta.env.VITE_TONCENTER_API_KEY || '';
+
+const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 export interface ParsedTransaction {
     id: string;
@@ -34,12 +36,12 @@ export class TonService {
         try {
             const parsed = Address.parseFriendly(toAddress);
             const state = await this.client.getContractState(parsed.address);
-            
+
             // Если у контракта нет кода или данных, он считается неинициализированным
             if (!state.code || !state.data) {
                 return false;
             }
-            
+
             // Если аккаунт активен, доверяем флагу из адреса
             return parsed.isBounceable;
         } catch (error) {
@@ -53,8 +55,7 @@ export class TonService {
      */
     getWalletContract(keyPair: KeyPair) {
         // v4R2 - текущий стандартный кошелек TON
-        const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
-        return wallet;
+        return WalletContractV4.create({workchain: 0, publicKey: keyPair.publicKey});
     }
 
     /**
@@ -73,10 +74,11 @@ export class TonService {
         try {
             const parsedAddress = Address.parse(address);
             const balance = await this.client.getBalance(parsedAddress);
-            return Number(balance) / 1e9; // Конвертация из nanoTON в TON
+            return Number(fromNano(balance));
         } catch (error) {
             console.error('Failed to get balance:', error);
-            return 0;
+            // НЕ возвращаем 0. Пробрасываем ошибку дальше.
+            throw error;
         }
     }
 
@@ -93,12 +95,19 @@ export class TonService {
     }
 
     /**
-     * Запрашивает и парсит последние транзакции кошелька
+     * Запрашивает и парсит последние транзакции кошелька.
+     * Пробрасывает ошибку наверх в случае сетевого сбоя.
      */
     async getTransactions(address: string, limit = 20): Promise<ParsedTransaction[]> {
         try {
             const parsedAddress = Address.parse(address);
             const txs = await this.client.getTransactions(parsedAddress, { limit });
+
+            // Если данных нет (например, кошелек пуст или API вернул null),
+            // возвращаем пустой массив, но не ошибку.
+            if (!txs || txs.length === 0) {
+                return [];
+            }
 
             return txs.map(tx => {
                 const inMsg = tx.inMessage;
@@ -106,42 +115,55 @@ export class TonService {
                 let amount = 0n;
                 let counterparty = '';
 
+                // Логика определения типа и контрагента
                 if (inMsg && inMsg.info.type === 'internal') {
                     if (inMsg.info.bounced) {
                         type = 'bounced';
-                        amount = inMsg.info.value.coins;
-                        counterparty = inMsg.info.src.toString({ testOnly: true });
                     } else {
                         type = 'in';
-                        amount = inMsg.info.value.coins;
-                        counterparty = inMsg.info.src.toString({ testOnly: true });
                     }
+                    amount = inMsg.info.value.coins;
+                    counterparty = inMsg.info.src.toString({ testOnly: true });
                 } else if (tx.outMessages.size > 0) {
                     type = 'out';
-                    const outMsg = tx.outMessages.values()[0];
+                    // Получаем первую исходящую транзакцию
+                    const outMessagesArray = Array.from(tx.outMessages.values());
+                    const outMsg = outMessagesArray[0];
+
                     if (outMsg?.info.type === 'internal') {
                         amount = outMsg.info.value.coins;
                         counterparty = outMsg.info.dest.toString({ testOnly: true });
                     }
                 }
 
+                // Определение статуса транзакции
+                let status: 'success' | 'failed' = 'failed';
+                if (tx.description.type === 'generic') {
+                    const computeSuccess = tx.description.computePhase?.type === 'vm' && tx.description.computePhase.success;
+                    const actionSuccess = tx.description.actionPhase?.success;
+                    // Транзакция успешна, если фаза вычислений прошла без ошибок
+                    if (computeSuccess || actionSuccess) {
+                        status = 'success';
+                    }
+                }
+
                 return {
-                    id: tx.hash().toString('hex'), // Уникальный ID
+                    id: tx.hash().toString('hex'),
                     hash: tx.hash().toString('hex'),
                     type: type,
                     amount: Number(amount) / 1e9,
                     date: new Date(tx.now * 1000).toISOString(),
                     address: counterparty,
-                    status: (tx.description.type === 'generic' && tx.description.computePhase?.type === 'vm' && tx.description.computePhase.success ? 'success' : 'failed') as 'success' | 'failed'
+                    status: status
                 };
-            }).filter(tx => tx.amount > 0); // Убираем технические транзакции с нулевой суммой
+            }).filter(tx => tx.amount > 0);
 
         } catch (error) {
-            console.error('Failed to fetch transactions:', error);
-            return [];
+            // Логируем для отладки, но пробрасываем ошибку дальше в Store
+            console.error('TonService: getTransactions network error:', error);
+            throw error;
         }
     }
-
     /**
      * Отправляет TON на указанный адрес
      */
@@ -158,7 +180,7 @@ export class TonService {
         try {
             const wallet = this.getWalletContract(keyPair);
             const contract = this.client.open(wallet);
-            
+
             // Если баланс 0, симуляция на ноде часто падает с 500 ошибкой
             const balance = await contract.getBalance().catch(() => 0n);
             if (balance === 0n) {
@@ -193,9 +215,9 @@ export class TonService {
                 return DEFAULT_FEE;
             }
 
-            const totalFee = (result.source_fees.in_fwd_fee || 0) + 
-                             (result.source_fees.storage_fee || 0) + 
-                             (result.source_fees.gas_fee || 0) + 
+            const totalFee = (result.source_fees.in_fwd_fee || 0) +
+                             (result.source_fees.storage_fee || 0) +
+                             (result.source_fees.gas_fee || 0) +
                              (result.source_fees.fwd_fee || 0);
 
             return Number(totalFee) / 1e9;
@@ -239,24 +261,40 @@ export class TonService {
     }
 
     /**
-     * Ожидает изменения seqno (подтверждения транзакции)
+     * Ожидает подтверждения транзакции
      */
-    async waitForTransaction(keyPair: KeyPair, initialSeqno: number, maxAttempts = 15): Promise<boolean> {
+    async waitForTransaction(keyPair: KeyPair, initialSeqno: number): Promise<boolean> {
+        const maxRetries = 20;
         const wallet = this.getWalletContract(keyPair);
         const contract = this.client.open(wallet);
 
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            await new Promise(resolve => setTimeout(resolve, 3000)); // Ждем 3 секунды
-            try {
-                const currentSeqno = await contract.getSeqno();
-                if (currentSeqno > initialSeqno) {
-                    return true; // Транзакция подтверждена
+
+        for (let i = 0; i < maxRetries; i++) {
+            await sleep(2000); // пауза между проверками
+            const currentSeqno = await contract.getSeqno();
+
+            if (currentSeqno > initialSeqno) {
+                // seqno изменился, теперь проверяем ПОСЛЕДНЮЮ транзакцию
+                const transactions = await this.client.getTransactions(contract.address, { limit: 1 });
+                if (!transactions || transactions.length === 0) {
+                    continue;
                 }
-            } catch (e) {
-                // Игнорируем ошибки сети при поллинге
+                const desc = transactions[0].description;
+
+                // Проверяем, что транзакция не является "отскочившей" (bounced)
+                // и в ней нет ошибок выполнения (exit_code === 0)
+                if (desc.type === 'generic') {
+                    // 1. Проверяем, не была ли транзакция прервана (aborted)
+                    // 2. Проверяем фазу вычислений (computePhase)
+                    // 3. Код выхода (exitCode) должен быть 0
+
+                    const computePhase = desc.computePhase;
+                    return !desc.aborted && computePhase.type === 'vm' && computePhase.exitCode === 0;
+                }
+                return desc.type !== 'tick-tock';
             }
         }
-        return false; // Тайм-аут
+        return false;
     }
 }
 

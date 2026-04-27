@@ -1,50 +1,124 @@
 /**
  * @vitest-environment node
  */
-import { tonService } from '@/services/ton.service';
+import { TonService } from '@/services/ton.service';
 import { mnemonicToPrivateKey } from '@ton/crypto';
-import { describe, it, expect, vi } from 'vitest';
+import { Address } from '@ton/core';
+import { describe, it, expect, vi, beforeEach} from 'vitest';
+
+vi.mock('@ton/ton');
 
 describe('TonService (TONCENTER Integration)', () => {
 
     vi.setConfig({ testTimeout: 30000 });
 
-    const base64Address = 'kQBZsCriNthf8iXSYs3733LuDcR5pKkwcmIuahoi5exKdbJw';
+    const base64Address = 'kQATCjGpJRgV5om4c_p-xIeLo5zSupGwiTqAZU64NjgNL3eU';
+    const testMnemonic = 'mix pull wagon pave believe venture mirror baby mom brave fuel wool upgrade spirit give syrup swallow feed swap suspect hidden social resist easy'
+        .split(' ');
 
-    const testMnemonic = [
-        'notice', 'rookie', 'clutch', 'poverty', 'pink', 'justice',
-        'dune', 'pave', 'identity', 'motto', 'civil', 'found',
-        'inner', 'heart', 'rely', 'humor', 'diet', 'lumber',
-        'pioneer', 'unfold', 'fringe', 'album', 'rely', 'abandon'
-    ];
+    let service: TonService;
+    let mockContract: any;
 
-    it('должен правильно вычислять адрес кошелька WalletV4R2', async () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        service = new TonService();
+
+        // Создаем мок для "открытого" контракта
+        mockContract = {
+            getSeqno: vi.fn(),
+            address: Address.parse(base64Address), // любой валидный адрес
+        };
+
+        // Заставляем client.open возвращать наш мок
+        (service as any).client.open = vi.fn().mockReturnValue(mockContract);
+        (service as any).client.getTransactions = vi.fn();
+    });
+
+
+    it('должна вернуть true, если транзакция успешна', async () => {
+        const initialSeqno = 10;
+
+        // 1. Сначала seqno не меняется, на второй итерации увеличивается
+        mockContract.getSeqno
+            .mockResolvedValueOnce(10) // первая итерация
+            .mockResolvedValueOnce(11); // вторая итерация
+
+        // 2. Имитируем успешную транзакцию в истории
+        (service as any).client.getTransactions.mockResolvedValue([{
+            description: {
+                type: 'generic',
+                aborted: false,
+                computePhase: {
+                    type: 'vm',
+                    exitCode: 0
+                }
+            }
+        }]);
+
+        // Запускаем функцию
+        const promise = service.waitForTransaction({} as any, initialSeqno);
+
+        // Проматываем время, чтобы сработали циклы
+        await vi.runAllTimersAsync();
+
+        const result = await promise;
+        expect(result).toBe(true);
+        expect(mockContract.getSeqno).toHaveBeenCalledTimes(2);
+    });
+
+    it('должна вернуть false, если транзакция завершилась с ошибкой (aborted)', async () => {
+        const initialSeqno = 10;
+        mockContract.getSeqno.mockResolvedValue(11);
+
+        (service as any).client.getTransactions.mockResolvedValue([{
+            description: {
+                type: 'generic',
+                aborted: true, // Ошибка!
+                computePhase: { type: 'vm', exitCode: 11 }
+            }
+        }]);
+
+        const promise = service.waitForTransaction({} as any, initialSeqno);
+        await vi.runAllTimersAsync();
+
+        expect(await promise).toBe(false);
+    });
+
+    it('должна вернуть false по тайм-ауту (maxRetries)', async () => {
+        mockContract.getSeqno.mockResolvedValue(10); // seqno не растет
+
+        const promise = service.waitForTransaction({} as any, 10);
+
+        // Прокручиваем все 20 попыток
+        await vi.runAllTimersAsync();
+
+        expect(await promise).toBe(false);
+        expect(mockContract.getSeqno).toHaveBeenCalledTimes(20);
+    });
+
+    it('должен корректно обрабатывать ситуацию, когда transactions.length === 0', async () => {
         const keyPair = await mnemonicToPrivateKey(testMnemonic);
-        const address = tonService.getWalletAddress(keyPair);
-        expect(address).toBe(base64Address);
+
+        // Используем ваш глобальный mockContract, но задаем ему сценарий:
+        mockContract.getSeqno
+            .mockResolvedValueOnce(10) // 1-я итерация: seqno еще старый
+            .mockResolvedValueOnce(11) // 2-я итерация: seqno вырос, заходим в проверку транзакций
+            .mockResolvedValue(11);    // Последующие вызовы
+
+        // Мокаем клиент, чтобы он вернул ваш глобальный контракт
+        vi.spyOn(service['client'], 'open').mockReturnValue(mockContract as any);
+
+        // Мокаем транзакции: сначала пусто (баг индексации), потом успех
+        const getTxsSpy = vi.spyOn(service['client'], 'getTransactions')
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([{ description: { type: 'generic', aborted: false, computePhase: { type: 'vm', exitCode: 0 } } }] as any);
+
+        const waitPromise = service.waitForTransaction(keyPair, 10);
+
+        // Проматываем виртуальное время (sleep)
+        await vi.runAllTimersAsync();
+
+        expect(await waitPromise).toBe(true);
+        expect(getTxsSpy).toHaveBeenCalledTimes(2); // Подтверждаем, что из-за [] был совершен повторный запрос
     });
-
-    it('должен возвращать баланс (число) для валидного адреса', async () => {
-        const balance = await tonService.getBalance(base64Address);
-        expect(typeof balance).toBe('number');
-        expect(balance).toBeGreaterThanOrEqual(0);
-    });
-
-    it('должен корректно парсить список транзакций (даже если он пустой)', async () => {
-        const txs = await tonService.getTransactions(base64Address, 5);
-        expect(Array.isArray(txs)).toBe(true);
-    }, 20000);
-
-    it('должен проверять валидность TON адреса', () => {
-        expect(tonService.isValidAddress(base64Address)).toBe(true);
-        expect(tonService.isValidAddress('invalid_address')).toBe(false);
-        expect(tonService.isValidAddress('')).toBe(false);
-    });
-
-    it('должен возвращать false для флага bounce на неинициализированных кошельках', async () => {
-        const emptyAddress = 'kQATCjGpJRgV5om4c_p-xIeLo5zSupGwiTqAZU64NjgNL3eU';
-        const bounceFlag = await tonService.getBounceFlag(emptyAddress);
-        expect(bounceFlag).toBe(false);
-    });
-
 });

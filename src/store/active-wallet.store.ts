@@ -1,9 +1,9 @@
-import { defineStore } from 'pinia';
-import { ref, watch } from 'vue';
-import { cryptoService } from '../services/crypto.service';
-import { tonService, ParsedTransaction } from '../services/ton.service';
+import {defineStore} from 'pinia';
+import {ref, watch} from 'vue';
+import {cryptoService} from '../services/crypto.service';
+import {ParsedTransaction, tonService} from '../services/ton.service';
 import {KeyPair, mnemonicToPrivateKey} from '@ton/crypto';
-import { useWalletManagerStore } from './wallet-manager.store';
+import {useWalletManagerStore} from './wallet-manager.store';
 
 const LOCAL_STORAGE_KEY_WHITELIST = 'wallet_whitelist_';
 
@@ -46,9 +46,7 @@ export const useActiveWalletStore = defineStore('activeWallet', () => {
     const wallet = manager.savedWallets[index];
     try {
       const mnemonic = cryptoService.decryptMnemonic(wallet.encryptedMnemonic, password);
-      const kp = await mnemonicToPrivateKey(mnemonic);
-
-      keyPair.value = kp;
+      keyPair.value = await mnemonicToPrivateKey(mnemonic);
       isUnlocked.value = true;
       address.value = wallet.address;
       dataError.value = null;
@@ -75,16 +73,22 @@ export const useActiveWalletStore = defineStore('activeWallet', () => {
     if (!address.value) return;
 
     isLoadingData.value = true;
-    dataError.value = null;
+    dataError.value = null; // Сбрасываем предыдущую ошибку
+
     try {
+      // Если любой из запросов упадет, мы попадем в блок catch
       const [newBalance, newTransactions] = await Promise.all([
-          tonService.getBalance(address.value),
-          tonService.getTransactions(address.value, 50)
+        tonService.getBalance(address.value),
+        tonService.getTransactions(address.value, 50)
       ]);
+
+      // Данные обновляются только при успешном ответе сети
       balance.value = newBalance;
       transactions.value = newTransactions;
     } catch (error: any) {
       console.error('Failed to refresh wallet data', error);
+      // Теперь здесь будет реальное сообщение об ошибке (например, "Network Error")
+      // Это установит баннер в UI через переменную dataError
       dataError.value = error?.message || 'Failed to fetch network data';
     } finally {
       isLoadingData.value = false;

@@ -16,63 +16,64 @@ export const addressGuard = {
      * Сравнивает начало и конец адреса с историей транзакций пользователя.
      */
     evaluateAddress(targetAddress: string, history: any[], whitelist: string[]): Evaluation {
-        // Очистка пробелов
         const cleanAddress = targetAddress.trim();
 
         // 1. Белый список (безопасно)
         if (whitelist.includes(cleanAddress)) {
-            return { 
-                level: RiskLevel.Low, 
-                reasons: ['Адрес находится в вашем белом списке доверенных адресов.'] 
-            };
-        }
-
-        // Если адрес короткий, мы пока не можем его оценить
-        if (cleanAddress.length < 16) {
             return {
                 level: RiskLevel.Low,
-                reasons: []
+                reasons: ['Адрес находится в вашем белом списке доверенных адресов.']
             };
         }
 
-        // 2. Поиск потенциальной подмены (Spoofing Attack)
-        // Сравниваем первые 6 и последние 4 символа
+        if (cleanAddress.length < 16) {
+            return { level: RiskLevel.Low, reasons: [] };
+        }
+
         const targetStart = cleanAddress.substring(0, 6).toLowerCase();
         const targetEnd = cleanAddress.slice(-4).toLowerCase();
 
-        // Извлекаем уникальные адреса из истории транзакций
-        const historyAddresses = Array.from(new Set(history.map(tx => tx.address).filter(Boolean)));
+        // Фильтруем историю: только УСПЕШНЫЕ ИСХОДЯЩИЕ транзакции
+        // Именно эти адреса мы считаем "своими" и безопасными
+        const trustedAddresses = Array.from(new Set(
+            history
+                .filter(tx => tx.type === 'out' && tx.status === 'success')
+                .map(tx => tx.address)
+                .filter(Boolean)
+        ));
 
-        for (const historyAddress of historyAddresses) {
-            // Если мы уже переводили на этот же самый адрес, то это не подмена
-            if (historyAddress === cleanAddress) {
-                return {
-                    level: RiskLevel.Low,
-                    reasons: ['Вы уже взаимодействовали с этим адресом ранее.']
-                };
-            }
+        // Проверяем на полное совпадение с доверенными адресами
+        if (trustedAddresses.includes(cleanAddress)) {
+            return {
+                level: RiskLevel.Low,
+                reasons: ['Вы уже успешно отправляли средства на этот адрес ранее.']
+            };
+        }
 
-            if (historyAddress.length >= 16) {
-                const historyStart = historyAddress.substring(0, 6).toLowerCase();
-                const historyEnd = historyAddress.slice(-4).toLowerCase();
+        // 2. Поиск потенциальной подмены (Spoofing Attack) относительно доверенных адресов
+        for (const trustedAddress of trustedAddresses) {
+            if (trustedAddress.length >= 16) {
+                const historyStart = trustedAddress.substring(0, 6).toLowerCase();
+                const historyEnd = trustedAddress.slice(-4).toLowerCase();
 
-                // Если начало и конец совпадают, но середина отличается — это КРИТИЧЕСКАЯ УГРОЗА (Spoofing)
+                // Если похож на доверенный, но не он сам — это КРИТИЧЕСКАЯ УГРОЗА
                 if (targetStart === historyStart && targetEnd === historyEnd) {
                     return {
                         level: RiskLevel.Critical,
                         reasons: [
-                            'ВНИМАНИЕ! Этот адрес очень похож на адрес из вашей истории, но отличается в середине.',
-                            'Это классическая атака нулевыми переводами (Spoofing). Будьте предельно осторожны!'
+                            'ВНИМАНИЕ! Этот адрес очень похож на адрес, которому вы доверяете, но отличается в середине.',
+                            'Это может быть атака подмены адреса (Spoofing). Проверьте каждый символ!'
                         ]
                     };
                 }
             }
         }
 
-        // 3. Совершенно новый адрес (не в белом списке и не похож на историю)
-        return { 
-            level: RiskLevel.Medium, 
-            reasons: ['Это новый адрес. Пожалуйста, внимательно проверьте его перед отправкой средств.'] 
+        // 3. Совершенно новый адрес ИЛИ адрес, с которого вам только ПРИХОДИЛИ деньги
+        // (По ТЗ: если на него не было исходящих, предупреждение остается)
+        return {
+            level: RiskLevel.Medium,
+            reasons: ['Вы еще не отправляли средства на этот адрес. Пожалуйста, проверьте его внимательно.']
         };
     }
 };
